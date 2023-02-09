@@ -42,7 +42,7 @@ def make_args():
     parser.add_argument('--ema', action="store_true", default=False)
 
     parser.add_argument('--frelu', type=str2bool, default=True)
-    parser.add_argument('--xformers', type=str2bool, default=True)
+    parser.add_argument('--xformers', type=str2bool, default=False)
 
     args = parser.parse_args()
     return args
