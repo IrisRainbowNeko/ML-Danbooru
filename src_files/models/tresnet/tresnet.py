@@ -7,10 +7,7 @@ from .layers.anti_aliasing import AntiAliasDownsampleLayer
 from .layers.avg_pool import FastAvgPool2d
 from .layers.general_layers import SEModule, SpaceToDepthModule
 
-try:
-    from inplace_abn import InPlaceABN, ABN
-except:
-    print('inplace_abn not install')
+from inplace_abn import InPlaceABN, ABN
 
 
 def InplacABN_to_ABN(module: nn.Module) -> nn.Module:

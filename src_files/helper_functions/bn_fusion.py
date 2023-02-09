@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 
-try:
-    from inplace_abn import ABN
-except:
-    print('inplace_abn not install')
+from inplace_abn import ABN
 
 
 def calc_activation(ABN_layer):
