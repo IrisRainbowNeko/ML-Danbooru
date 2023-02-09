@@ -47,15 +47,17 @@ def make_args():
     args = parser.parse_args()
     return args
 
+
 def crop_fix(img: Image):
-    w,h=img.size
-    w=(w//4)*4
-    h=(h//4)*4
-    return img.crop((0,0,w,h))
+    w, h = img.size
+    w = (w // 4) * 4
+    h = (h // 4) * 4
+    return img.crop((0, 0, w, h))
+
 
 class Demo:
     def __init__(self, args):
-        self.args=args
+        self.args = args
 
         print('creating model {}...'.format(args.model_name))
         args.model_path = None
@@ -64,12 +66,38 @@ class Demo:
         if args.ema:
             state = state['ema']
         elif 'model' in state:
-            state=state['model']
+            state = state['model']
+
+        if not args.xformers and 'head.decoder.layers.0.multihead_attn.in_proj_container.q_proj.weight' in state:
+            in_proj_weight = torch.cat([state['head.decoder.layers.0.multihead_attn.in_proj_container.q_proj.weight'],
+                                        state['head.decoder.layers.0.multihead_attn.in_proj_container.k_proj.weight'],
+                                        state[
+                                            'head.decoder.layers.0.multihead_attn.in_proj_container.v_proj.weight'], ],
+                                       dim=0)
+            in_proj_bias = torch.cat([state['head.decoder.layers.0.multihead_attn.in_proj_container.q_proj.bias'],
+                                      state['head.decoder.layers.0.multihead_attn.in_proj_container.k_proj.bias'],
+                                      state['head.decoder.layers.0.multihead_attn.in_proj_container.v_proj.bias'], ],
+                                     dim=0)
+            state['head.decoder.layers.0.multihead_attn.out_proj.weight'] = state[
+                'head.decoder.layers.0.multihead_attn.proj.weight']
+            state['head.decoder.layers.0.multihead_attn.out_proj.bias'] = state[
+                'head.decoder.layers.0.multihead_attn.proj.bias']
+            state['head.decoder.layers.0.multihead_attn.in_proj_weight'] = in_proj_weight
+            state['head.decoder.layers.0.multihead_attn.in_proj_bias'] = in_proj_bias
+
+            del state['head.decoder.layers.0.multihead_attn.in_proj_container.q_proj.weight']
+            del state['head.decoder.layers.0.multihead_attn.in_proj_container.k_proj.weight']
+            del state['head.decoder.layers.0.multihead_attn.in_proj_container.v_proj.weight']
+            del state['head.decoder.layers.0.multihead_attn.in_proj_container.q_proj.bias']
+            del state['head.decoder.layers.0.multihead_attn.in_proj_container.k_proj.bias']
+            del state['head.decoder.layers.0.multihead_attn.in_proj_container.v_proj.bias']
+            del state['head.decoder.layers.0.multihead_attn.proj.weight']
+            del state['head.decoder.layers.0.multihead_attn.proj.bias']
 
         try:
             model.load_state_dict(state, strict=True)
         except:
-            state={k.strip('module.'):v for k,v in state.items()}
+            state = {k.strip('module.'): v for k, v in state.items()}
             model.load_state_dict(state, strict=False)
 
         model.eval()
@@ -91,9 +119,9 @@ class Demo:
             ])
         else:
             self.trans = transforms.Compose([
-                                    transforms.Resize((args.image_size, args.image_size)),
-                                    transforms.ToTensor(),
-                                ])
+                transforms.Resize((args.image_size, args.image_size)),
+                transforms.ToTensor(),
+            ])
 
         self.load_class_map()
 
@@ -110,19 +138,20 @@ class Demo:
     def infer(self, path):
         img = self.load_data(path).to(device)
         if self.args.fp16:
-            img=img.half()
+            img = img.half()
         img = img.unsqueeze(0)
         output = torch.sigmoid(self.model(img)).cpu().view(-1)
         pred = torch.where(output > self.args.thr)[0].numpy()
 
-        cls_list=[(self.class_map[str(i)], output[i]) for i in pred]
+        cls_list = [(self.class_map[str(i)], output[i]) for i in pred]
         return cls_list
+
 
 if __name__ == '__main__':
     args = make_args()
     demo = Demo(args)
     cls_list = demo.infer(args.data)
 
-    cls_list.sort(reverse=True, key=lambda x:x[1])
+    cls_list.sort(reverse=True, key=lambda x: x[1])
     print(', '.join([f'{name}:{prob:.3}' for name, prob in cls_list]))
     print(', '.join([name for name, prob in cls_list]))
