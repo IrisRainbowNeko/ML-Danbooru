@@ -104,11 +104,12 @@ class MLDecoder(nn.Module):
         else:
             query_embed = self.decoder.query_embed.weight
         # tgt = query_embed.unsqueeze(1).repeat(1, bs, 1)
-        tgt = query_embed.unsqueeze(0).expand(bs, -1, -1)  # no allocation of memory with expand
 
         if self.use_xformers:
+            tgt = query_embed.unsqueeze(0).expand(bs, -1, -1)  # no allocation of memory with expand
             h = self.decoder(tgt, embedding_spatial_786) # [B, N_query, 768]
         else:
+            tgt = query_embed.unsqueeze(1).expand(-1, bs, -1)  # no allocation of memory with expand
             h = self.decoder(tgt, embedding_spatial_786.transpose(0, 1))  # [N_query, B, 768]
             h = h.transpose(0, 1) # [B, N_query, 768]
 
