@@ -6,7 +6,11 @@ from collections import OrderedDict
 from .layers.anti_aliasing import AntiAliasDownsampleLayer
 from .layers.avg_pool import FastAvgPool2d
 from .layers.general_layers import SEModule, SpaceToDepthModule
-from inplace_abn import InPlaceABN, ABN
+
+try:
+    from inplace_abn import InPlaceABN, ABN
+except:
+    print('inplace_abn not install')
 
 
 def InplacABN_to_ABN(module: nn.Module) -> nn.Module:
