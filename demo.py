@@ -9,8 +9,13 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 
 from src_files.helper_functions.bn_fusion import fuse_bn_recursively
-from src_files.models.tresnet.tresnet import InplacABN_to_ABN
 from src_files.models import create_model
+
+use_abn=True
+try:
+    from src_files.models.tresnet.tresnet import InplacABN_to_ABN
+except:
+    use_abn=False
 
 import json
 from PIL import Image
@@ -103,7 +108,8 @@ class Demo:
         model.eval()
         ########### eliminate BN for faster inference ###########
         model = model.cpu()
-        model = InplacABN_to_ABN(model)
+        if use_abn:
+            model = InplacABN_to_ABN(model)
         model = fuse_bn_recursively(model)
         self.model = model.to(device).eval()
         if args.fp16:

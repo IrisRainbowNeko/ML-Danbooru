@@ -5,7 +5,12 @@ from urllib import request
 import torch
 
 from ...ml_decoder import ml_decoder_colo, ml_decoder
-from ..tresnet import tresnet_f, tresnet
+from ..tresnet import tresnet_f
+
+try:
+    from ..tresnet import tresnet
+except:
+    print('inplace_abn not install, only tresnet_f available.')
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
 
-from inplace_abn import ABN
+try:
+    from inplace_abn import ABN
+except:
+    ABN=nn.Identity
 
 
 def calc_activation(ABN_layer):
