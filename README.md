@@ -14,10 +14,10 @@ https://huggingface.co/7eu7d7/ML-Danbooru
 ## Usage
 Download the model and run below command:
 ```bash
-python demo.py --data <path to image> --model_name tresnet_d --num_of_groups 32 --ckpt <path to ckpt> --thr 0.7 --image_size 640 
+python demo.py --data <path to image or directory> --model_name tresnet_d --num_of_groups 32 --ckpt <path to ckpt> --thr 0.7 --image_size 640 
 ```
 
 Keep the image ratio invariant:
 ```bash
-python demo.py --data <path to image> --model_name tresnet_d --num_of_groups 32 --ckpt <path to ckpt> --thr 0.7 --image_size 640 --keep_ratio True
+python demo.py --data <path to image or directory> --model_name tresnet_d --num_of_groups 32 --ckpt <path to ckpt> --thr 0.7 --image_size 640 --keep_ratio True
 ```
