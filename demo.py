@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 
 from src_files.helper_functions.bn_fusion import fuse_bn_recursively
 from src_files.models import create_model
+from tqdm.auto import tqdm
 
 use_abn=True
 try:
@@ -21,6 +22,7 @@ import json
 from PIL import Image
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".bmp"]
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
@@ -140,9 +142,7 @@ class Demo:
         img = self.trans(img)
         return img
 
-    @torch.no_grad()
-    def infer(self, path):
-        img = self.load_data(path).to(device)
+    def infer_one(self, img):
         if self.args.fp16:
             img = img.half()
         img = img.unsqueeze(0)
@@ -152,12 +152,29 @@ class Demo:
         cls_list = [(self.class_map[str(i)], output[i]) for i in pred]
         return cls_list
 
+    @torch.no_grad()
+    def infer(self, path):
+        if os.path.isfile(path):
+            img = self.load_data(path).to(device)
+            cls_list = self.infer_one(img)
+            return cls_list
+        else:
+            img_list=[os.path.join(path, x) for x in os.listdir(path) if x[x.rfind('.'):].lower() in IMAGE_EXTENSIONS]
+            for item in tqdm(img_list):
+                img = self.load_data(item).to(device)
+                cls_list = self.infer_one(img)
+                cls_list.sort(reverse=True, key=lambda x: x[1])
+                with open(item[:item.rfind('.')]+'.txt', 'w', encoding='utf8') as f:
+                    f.write(', '.join([name.replace('_', ' ') for name, prob in cls_list]))
+
+            return None
 
 if __name__ == '__main__':
     args = make_args()
     demo = Demo(args)
     cls_list = demo.infer(args.data)
 
-    cls_list.sort(reverse=True, key=lambda x: x[1])
-    print(', '.join([f'{name}:{prob:.3}' for name, prob in cls_list]))
-    print(', '.join([name for name, prob in cls_list]))
+    if cls_list is not None:
+        cls_list.sort(reverse=True, key=lambda x: x[1])
+        print(', '.join([f'{name}:{prob:.3}' for name, prob in cls_list]))
+        print(', '.join([name for name, prob in cls_list]))
