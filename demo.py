@@ -11,6 +11,7 @@ import torchvision.transforms as transforms
 from src_files.helper_functions.bn_fusion import fuse_bn_recursively
 from src_files.models import create_model
 from tqdm.auto import tqdm
+import json
 
 use_abn=True
 try:
@@ -50,6 +51,8 @@ def make_args():
 
     parser.add_argument('--frelu', type=str2bool, default=True)
     parser.add_argument('--xformers', type=str2bool, default=False)
+
+    parser.add_argument('--out_type', type=str, default='txt')
 
     args = parser.parse_args()
     return args
@@ -159,13 +162,21 @@ class Demo:
             cls_list = self.infer_one(img)
             return cls_list
         else:
+            tag_dict={}
             img_list=[os.path.join(path, x) for x in os.listdir(path) if x[x.rfind('.'):].lower() in IMAGE_EXTENSIONS]
             for item in tqdm(img_list):
                 img = self.load_data(item).to(device)
                 cls_list = self.infer_one(img)
                 cls_list.sort(reverse=True, key=lambda x: x[1])
-                with open(item[:item.rfind('.')]+'.txt', 'w', encoding='utf8') as f:
-                    f.write(', '.join([name.replace('_', ' ') for name, prob in cls_list]))
+                if self.args.out_type=='txt':
+                    with open(item[:item.rfind('.')]+'.txt', 'w', encoding='utf8') as f:
+                        f.write(', '.join([name.replace('_', ' ') for name, prob in cls_list]))
+                elif self.args.out_type=='json':
+                    tag_dict[os.path.basename(item)]=', '.join([name.replace('_', ' ') for name, prob in cls_list])
+
+            if self.args.out_type == 'json':
+                with open(os.path.join(path, 'image_captions.json'), 'w', encoding='utf8') as f:
+                    f.write(json.dumps(tag_dict))
 
             return None
 
