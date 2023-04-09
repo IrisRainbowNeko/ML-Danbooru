@@ -6,6 +6,7 @@ from copy import deepcopy
 import numpy as np
 from PIL import Image
 import torch
+from torch import nn
 from PIL import ImageDraw
 import json
 import torch.utils.data as data
@@ -13,6 +14,8 @@ from sklearn.preprocessing import MultiLabelBinarizer
 import pandas as pd
 
 from tqdm import tqdm
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def parse_args(parser):
     # parsing args
@@ -100,12 +103,12 @@ class ModelEma(torch.nn.Module):
         if self.device is not None:
             self.module.to(device=device)
 
-    def _update(self, model, update_fn):
+    def _update(self, model:nn.Module, update_fn):
         with torch.no_grad():
-            for ema_v, model_v in zip(self.module.state_dict().values(), model.state_dict().values()):
+            for p_ema, p_model in zip(self.module.parameters(), model.parameters()):
                 if self.device is not None:
-                    model_v = model_v.to(device=self.device)
-                ema_v.copy_(update_fn(ema_v, model_v))
+                    p_model = p_model.to(device=self.device)
+                p_ema.copy_(update_fn(p_ema, p_model))
 
     def update(self, model):
         self._update(model, update_fn=lambda e, m: self.decay * e + (1. - self.decay) * m)
@@ -150,6 +153,29 @@ def add_weight_decay(model, weight_decay=1e-4, skip_list=()):
         {'params': no_decay, 'weight_decay': 0.},
         {'params': decay, 'weight_decay': weight_decay}]
 
+def add_weight_decay_lr(model, weight_decay=1e-4, lr_backbone=1e-5, backbone_name='backbone', skip_list=()):
+    decay = [[],[]]
+    no_decay = [[],[]]
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue  # frozen weights
+        if len(param.shape) == 1 or name.endswith(".bias") or name in skip_list:
+            if backbone_name in name and param.requires_grad:
+                no_decay[0].append(param)
+            else:
+                no_decay[1].append(param)
+        else:
+            if backbone_name in name and param.requires_grad:
+                decay[0].append(param)
+            else:
+                decay[1].append(param)
+    return [
+        {'params': no_decay[0], 'weight_decay': 0., "lr": lr_backbone},
+        {'params': no_decay[1], 'weight_decay': 0.},
+        {'params': decay[0], 'weight_decay': weight_decay, "lr": lr_backbone},
+        {'params': decay[1], 'weight_decay': weight_decay},
+    ]
+
 
 def get_class_ids_split(json_path, classes_dict):
     with open(json_path) as fp:
@@ -188,14 +214,14 @@ def get_class_ids_split(json_path, classes_dict):
 def update_wordvecs(model, train_wordvecs=None, test_wordvecs=None):
     if hasattr(model, 'fc'):
         if train_wordvecs is not None:
-            model.fc.decoder.query_embed = train_wordvecs.transpose(0, 1).cuda()
+            model.fc.decoder.query_embed = train_wordvecs.transpose(0, 1).to(device)
         else:
-            model.fc.decoder.query_embed = test_wordvecs.transpose(0, 1).cuda()
+            model.fc.decoder.query_embed = test_wordvecs.transpose(0, 1).to(device)
     elif hasattr(model, 'head'):
         if train_wordvecs is not None:
-            model.head.decoder.query_embed = train_wordvecs.transpose(0, 1).cuda()
+            model.head.decoder.query_embed = train_wordvecs.transpose(0, 1).to(device)
         else:
-            model.head.decoder.query_embed = test_wordvecs.transpose(0, 1).cuda()
+            model.head.decoder.query_embed = test_wordvecs.transpose(0, 1).to(device)
     else:
         print("model is not suited for ml-decoder")
         exit(-1)
@@ -261,3 +287,9 @@ def get_datasets_from_csv(dataset_local_path, metadata_local_path, train_transfo
                              transform=val_transform, class_ids=test_cls_ids)
 
     return train_dl, val_dl, train_cls_ids, test_cls_ids
+
+def crop_fix(img: Image):
+    w,h=img.size
+    w=(w//4)*4
+    h=(h//4)*4
+    return img.crop((0,0,w,h))

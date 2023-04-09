@@ -21,3 +21,8 @@ Keep the image ratio invariant:
 ```bash
 python demo.py --data <path to image or directory> --model_name tresnet_d --num_of_groups 32 --ckpt <path to ckpt> --thr 0.7 --image_size 640 --keep_ratio True
 ```
+
+### ML_CAFormer
+```bash
+python demo.py --data <path to image or directory> --model_name caformer_m36 --ckpt <path to ckpt> --thr 0.7 --image_size 448
+```

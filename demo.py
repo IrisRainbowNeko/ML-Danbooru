@@ -43,7 +43,7 @@ def make_args():
 
     # ML-Decoder
     parser.add_argument('--use_ml_decoder', default=1, type=int)
-    parser.add_argument('--num_of_groups', default=20, type=int)  # full-decoding
+    parser.add_argument('--num_of_groups', default=32, type=int)  # full-decoding
     parser.add_argument('--decoder_embedding', default=1024, type=int)
     parser.add_argument('--zsl', default=0, type=int)
     parser.add_argument('--fp16', action="store_true", default=False)
