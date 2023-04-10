@@ -139,6 +139,7 @@ if __name__ == '__main__':
     demo = Demo(args)
     cls_list = demo.infer(args.data)
 
-    cls_list.sort(reverse=True, key=lambda x:x[1])
-    print(', '.join([f'{name}:{prob:.3}' for name, prob in cls_list]))
-    print(', '.join([name for name, prob in cls_list]))
+    if cls_list is not None:
+        cls_list.sort(reverse=True, key=lambda x: x[1])
+        print(', '.join([f'{name}:{prob:.3}' for name, prob in cls_list]))
+        print(', '.join([name for name, prob in cls_list]))
