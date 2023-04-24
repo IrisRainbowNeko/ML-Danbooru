@@ -8,6 +8,10 @@ Model trained with cleaned [danbooru2021](https://gwern.net/danbooru2021).
 + Replace the ReLU in backbone with [FReLU](https://arxiv.org/pdf/2007.11824.pdf).
 + Using learnable queries for transformer decoder.
 
+## Model Structure
+
+![](./imgs/ml_danbooru.png)
+
 ## Model-Zoo
 https://huggingface.co/7eu7d7/ML-Danbooru
 
@@ -24,5 +28,5 @@ python demo.py --data <path to image or directory> --model_name tresnet_d --num_
 
 ### ML_CAFormer
 ```bash
-python demo.py --data <path to image or directory> --model_name caformer_m36 --ckpt <path to ckpt> --thr 0.7 --image_size 448
+python demo_ca.py --data <path to image or directory> --model_name caformer_m36 --ckpt <path to ckpt> --thr 0.7 --image_size 448
 ```
