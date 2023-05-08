@@ -12,6 +12,7 @@ from src_files.helper_functions.bn_fusion import fuse_bn_recursively
 from src_files.helper_functions.helper_functions import crop_fix
 from src_files.models.tresnet.tresnet import InplacABN_to_ABN
 from src_files.models import create_model
+from tqdm.auto import tqdm
 
 import json
 from PIL import Image
@@ -20,6 +21,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".bmp"]
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
@@ -51,6 +53,8 @@ def make_args():
     parser.add_argument('--num_head_decoder', default=8, type=int)
     parser.add_argument('--num_queries', default=80, type=int)
     parser.add_argument('--scale_skip', default=1, type=int)
+
+    parser.add_argument('--out_type', type=str, default='json')
 
     args = parser.parse_args()
     return args
