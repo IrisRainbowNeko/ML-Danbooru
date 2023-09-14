@@ -8,9 +8,8 @@ import torch.optim
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 
-from src_files.helper_functions.bn_fusion import fuse_bn_recursively
+from src_files.data.path_dataset import PathDataset
 from src_files.helper_functions.helper_functions import crop_fix
-from src_files.models.tresnet.tresnet import InplacABN_to_ABN
 from src_files.models import create_model
 from tqdm.auto import tqdm
 
@@ -38,6 +37,7 @@ def make_args():
     parser.add_argument('--thr', default=0.75, type=float,
                         metavar='N', help='threshold value')
     parser.add_argument('--keep_ratio', type=str2bool, default=False)
+    parser.add_argument('--bs', type=int, default=1)
 
     # ML-Decoder
     parser.add_argument('--use_ml_decoder', default=0, type=int)
@@ -74,8 +74,6 @@ class Demo:
         model.load_state_dict(state, strict=True)
 
         self.model = model.to(device).eval()
-        if args.fp16:
-            self.model = self.model.half()
         #######################################################
         print('done')
 
@@ -95,7 +93,7 @@ class Demo:
 
     def load_class_map(self):
         with open(self.args.class_map, 'r') as f:
-            self.class_map = json.loads(f.read())
+            self.class_map = json.load(f)
 
     def load_data(self, path):
         img = Image.open(path).convert('RGB')
@@ -103,10 +101,9 @@ class Demo:
         return img
 
     def infer_one(self, img):
-        if self.args.fp16:
-            img = img.half()
-        img = img.unsqueeze(0)
-        output = torch.sigmoid(self.model(img)).cpu().view(-1)
+        with torch.cuda.amp.autocast(enabled=self.args.fp16):
+            img = img.unsqueeze(0)
+            output = torch.sigmoid(self.model(img)).cpu().view(-1)
         pred = torch.where(output > self.args.thr)[0].numpy()
 
         cls_list = [(self.class_map[str(i)], output[i]) for i in pred]
@@ -133,15 +130,45 @@ class Demo:
 
             if self.args.out_type == 'json':
                 with open(os.path.join(path, 'image_captions.json'), 'w', encoding='utf8') as f:
-                    f.write(json.dumps(tag_dict))
+                    f.write(json.dumps(tag_dict, indent=2, ensure_ascii=False))
 
             return None
 
-#python demo_ca.py --data imgs/t1.jpg --model_name caformer_m36 --ckpt ckpt/caformer_m36-2-20000.ckpt --thr 0.7 --image_size 448
+    @torch.no_grad()
+    def infer_batch(self, path, bs=8):
+        tag_dict = {}
+        img_list = [os.path.join(path, x) for x in os.listdir(path) if x[x.rfind('.'):].lower() in IMAGE_EXTENSIONS]
+        dataset = PathDataset(img_list, self.trans)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=bs, num_workers=4, shuffle=False)
+
+        for imgs, path_list in tqdm(loader):
+            imgs = imgs.to(device)
+
+            with torch.cuda.amp.autocast(enabled=self.args.fp16):
+                output_batch = torch.sigmoid(self.model(imgs)).cpu()
+
+            for output, img_path in zip(output_batch, path_list):
+                pred = torch.where(output>self.args.thr)[0].numpy()
+                cls_list = [(self.class_map[str(i)], output[i]) for i in pred]
+                cls_list.sort(reverse=True, key=lambda x:x[1])
+                if self.args.out_type == 'txt':
+                    with open(img_path[:img_path.rfind('.')]+'.txt', 'w', encoding='utf8') as f:
+                        f.write(', '.join([name.replace('_', ' ') for name, prob in cls_list]))
+                elif self.args.out_type == 'json':
+                    tag_dict[os.path.basename(img_path)] = ', '.join([name.replace('_', ' ') for name, prob in cls_list])
+
+        if self.args.out_type == 'json':
+            with open(os.path.join(path, 'image_captions.json'), 'w', encoding='utf8') as f:
+                f.write(json.dumps(tag_dict, indent=2, ensure_ascii=False))
+
+#python demo_ca.py --data imgs/t1.jpg --model_name caformer_m36 --ckpt ckpt/ml_caformer_m36_dec-5-97527.ckpt --thr 0.7 --image_size 448
 if __name__ == '__main__':
     args = make_args()
     demo = Demo(args)
-    cls_list = demo.infer(args.data)
+    if args.bs>1:
+        cls_list = demo.infer_batch(args.data, args.bs)
+    else:
+        cls_list = demo.infer(args.data)
 
     if cls_list is not None:
         cls_list.sort(reverse=True, key=lambda x: x[1])
